@@ -4,9 +4,6 @@ on:
   pull_request:
     types: [labeled, synchronize]
 
-permissions:
-  contents: read
-
 env:
   PYTHON_VERSION: 3.12
 
@@ -71,8 +68,7 @@ jobs:
       - name: Patch visual diff generator
         uses: actions/checkout@v7.0.1
         with:
-          repository: django/djangoproject.foo
-          ref: main
+          repository: smallsaucepan/djangoproject.foo
           sparse-checkout: djangoproject/tests/test_visual_diff.py
           sparse-checkout-cone-mode: false
 
@@ -98,7 +94,7 @@ jobs:
       - name: Patch visual diff generator
         uses: actions/checkout@v7.0.1
         with:
-          repository: django/djangoproject.foo
+          repository: smallsaucepan/djangoproject.foo
           sparse-checkout: djangoproject/tests/test_visual_diff.py
           sparse-checkout-cone-mode: false
 
