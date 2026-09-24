@@ -45,9 +45,11 @@ jobs:
           PGPASSWORD="postgres" createdb -U postgres -O code.djangoproject code.djangoproject -h localhost
           PGPASSWORD="postgres" psql -U postgres -h localhost -c "ALTER USER djangoproject WITH PASSWORD 'secret';"
           PGPASSWORD="postgres" psql -U postgres -h localhost -c "ALTER USER \"code.djangoproject\" WITH PASSWORD 'secret';"
+
       - name: Load Trac data
         run: |
           PGPASSWORD="postgres" psql -U postgres -d code.djangoproject -h localhost < tracdb/trac.sql
+
       - name: Create secrets.json
         working-directory: ..
         run: |
@@ -64,6 +66,10 @@ jobs:
           python -m pip install -r requirements/tests.txt
           python -m pip install 'pixelmatch>=0.3.0'
           python -m playwright install --with-deps chromium
+
+      - name: Static files
+        run: |
+          make collectstatics
 
       - name: Generate baseline screenshots
         env:
@@ -83,6 +89,10 @@ jobs:
           python -m pip install -r requirements/tests.txt
           python -m pip install pixelmatch>=0.3.0
           python -m playwright install --with-deps chromium
+
+      - name: Static files
+        run: |
+          make collectstatics
 
       - name: Compare screenshots against baseline
         env:
