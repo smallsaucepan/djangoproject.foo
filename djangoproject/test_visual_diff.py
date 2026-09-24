@@ -137,7 +137,7 @@ class ScreenshotTests(ReleaseMixin, GenerateScreenshotMixin, StaticLiveServerTes
             os.remove(diff_list_path)
 
         for sitemap in sitemaps.values():
-            for location in [url.get("location") for url in sitemap().get_urls()][:2]:
+            for location in [url.get("location") for url in sitemap().get_urls()]:
                 themes = ["dark", "light"]
                 # https://www.browserstack.com/guide/common-screen-resolutions
                 # 414, 768, 1366
