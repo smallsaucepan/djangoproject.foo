@@ -1,0 +1,113 @@
+name: Generate visual diff screenshots
+
+on:
+  pull_request:
+    types: [labeled, synchronize]
+
+env:
+  PYTHON_VERSION: 3.12
+
+jobs:
+  visual-diff:
+    runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.labels.*.name, 'screenshots')
+
+    services:
+      postgres:
+        image: postgres:17-trixie
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # Screenshot run #1
+      - name: Checkout PR branch base
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Set up databases
+        run: |
+          PGPASSWORD="postgres" createuser -U postgres -d djangoproject --superuser -h localhost
+          PGPASSWORD="postgres" createdb -U postgres -O djangoproject djangoproject -h localhost
+          PGPASSWORD="postgres" createuser -U postgres -d code.djangoproject --superuser -h localhost
+          PGPASSWORD="postgres" createdb -U postgres -O code.djangoproject code.djangoproject -h localhost
+          PGPASSWORD="postgres" psql -U postgres -h localhost -c "ALTER USER djangoproject WITH PASSWORD 'secret';"
+          PGPASSWORD="postgres" psql -U postgres -h localhost -c "ALTER USER \"code.djangoproject\" WITH PASSWORD 'secret';"
+      - name: Load Trac data
+        run: |
+          PGPASSWORD="postgres" psql -U postgres -d code.djangoproject -h localhost < tracdb/trac.sql
+      - name: Create secrets.json
+        working-directory: ..
+        run: |
+          mkdir conf
+          echo '{"db_host": "localhost", ' > conf/secrets.json
+          echo '"db_password": "secret", ' >> conf/secrets.json
+          echo '"trac_db_host": "localhost", ' >> conf/secrets.json
+          echo '"trac_db_password": "secret", ' >> conf/secrets.json
+          echo '"secret_key": "a"}' >> conf/secrets.json
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip setuptools
+          python -m pip install -r requirements/tests.txt
+          python -m pip install 'pixelmatch>=0.3.0'
+          python -m playwright install --with-deps chromium
+
+      - name: Patch visual diff generator
+        uses: actions/checkout@v7.0.1
+        with:
+          repository: django/djangoproject.foo
+          sparse-checkout: djangoproject/tests/test_visual_diff.py
+          sparse-checkout-cone-mode: false
+
+      - name: Generate baseline screenshots
+        env:
+          SCREENSHOT_MODE: baseline
+          SCREENSHOT_DIR: /tmp/screenshots
+        run: python -m manage test --verbosity 2 djangoproject.test_visual_diff.ScreenshotTest
+
+      # Screenshot run #2
+      - name: Checkout PR branch head
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          clean: true
+
+      - name: Install deps
+        run: |
+          python -m pip install -r requirements/tests.txt
+          python -m pip install pixelmatch>=0.3.0
+          python -m playwright install --with-deps chromium
+
+      - name: Patch visual diff generator
+        uses: actions/checkout@v7.0.1
+        with:
+          repository: django/djangoproject.foo
+          sparse-checkout: djangoproject/tests/test_visual_diff.py
+          sparse-checkout-cone-mode: false
+
+      - name: Compare screenshots against baseline
+        env:
+          SCREENSHOT_MODE: compare
+          SCREENSHOT_DIR: /tmp/screenshots
+        run: python -m manage test --verbosity 2 djangoproject.test_visual_diff.ScreenshotTest
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-diff-results
+          path: |
+            /tmp/screenshots

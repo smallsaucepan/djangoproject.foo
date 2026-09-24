@@ -1242,7 +1242,6 @@ a.cta {
 
         +.link-readmore {
             display: block;
-            text-align: center;
 
             @include respond-min(768px) {
                 margin-top: -10px;

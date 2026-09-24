@@ -171,26 +171,6 @@ Then run::
 
     make test TEST_ARGS="--browser chromium --browser firefox"
 
-Supported browsers
-------------------
-
-The goal of the site is to target various levels of browsers, depending on
-their ability to use the technologies in use on the site, such as HTML5, CSS3,
-SVG, webfonts.
-
-We're following `Mozilla's example <https://wiki.mozilla.org/Support/Browser_Support>`_
-when it comes to categorizing browser support.
-
-- Desktop browsers, except as noted below, are **A grade**, meaning that
-  everything needs to work.
-
-- IE < 11 is **not supported** (based on Microsoft's support).
-
-- Mobile browsers should be considered **B grade** as well.
-  Mobile Safari, Firefox on Android and the Android Browser should support
-  the responsive styles as much as possible but some degradation can't be
-  prevented due to the limited screen size and other platform restrictions.
-
 File locations
 --------------
 
