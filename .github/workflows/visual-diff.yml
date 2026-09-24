@@ -94,11 +94,19 @@ jobs:
         run: |
           make collectstatics
 
-      - name: Compare screenshots against baseline
+      - name: Generate comparison screenshots
         env:
           SCREENSHOT_MODE: compare
           SCREENSHOT_DIR: /tmp/screenshots
         run: python -m manage test --verbosity 2 djangoproject.test_visual_diff.ScreenshotTests
+
+      - name: List differences
+        run: |
+          if [ -f /tmp/screenshots/diffs.txt ]; then
+            cat /tmp/screenshots/diffs.txt
+          else
+            echo "No differences found."
+          fi
 
       - name: Upload results
         uses: actions/upload-artifact@v7.0.1

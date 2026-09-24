@@ -1,6 +1,7 @@
 import io
 import os
 import re
+from pathlib import Path
 from unittest import skipUnless
 
 from django.conf import settings
@@ -15,6 +16,11 @@ from docs.models import DocumentRelease, Release
 
 from .settings.dev import HOST_SCHEME, PARENT_HOST
 
+screenshots_dir = (
+    Path(__file__).parent.joinpath(os.environ["SCREENSHOT_DIR"])
+    if "SCREENSHOT_DIR" in os.environ
+    else Path(__file__).parent.joinpath("tests", "screenshots")
+)
 
 class ReleaseMixin:
     @classmethod
@@ -48,6 +54,7 @@ class GenerateScreenshotMixin:
             os.remove(diff_path)
 
         page.goto(self.live_server_url + path)
+        page.wait_for_timeout(500)
         screenshot_bytes = page.screenshot(full_page=True)
 
         if os.environ["SCREENSHOT_MODE"] == "baseline":
@@ -84,22 +91,15 @@ class GenerateScreenshotMixin:
         diff_ratio = pixelmatch(current, baseline, diff)
         if diff_ratio > 0:
             diff.save(diff_path)
-            print(f"Differences in {'/'.join([screen_name, *variant])}")
+            return f"Differences in {'/'.join([screen_name, *variant])}"
 
         # if diff_ratio > threshold:
         #     self.fail(f"Screenshot {screen_name!r} differs by {diff_ratio:.2%} (threshold {threshold:.2%})")
 
     def _screenshot_path(self, screen_name, variant, name):
-        from pathlib import Path
-
-        if os.environ["SCREENSHOT_DIR"]:
-            return Path(__file__).parent.joinpath(
-                os.environ["SCREENSHOT_DIR"], screen_name, *variant, name
-            )
-        else:
-            return Path(__file__).parent.joinpath(
-                "tests", "screenshots", screen_name, *variant, name
-            )
+        return Path().joinpath(
+            screenshots_dir, screen_name, *variant, name
+        )
 
 
 @skipUnless(
@@ -128,12 +128,20 @@ class ScreenshotTests(ReleaseMixin, GenerateScreenshotMixin, StaticLiveServerTes
         self.setUpTestData()
 
     def test_screenshots(self):
+        msgs = []
+
+        diff_list_path = Path.joinpath(screenshots_dir, "diffs.txt")
+
+        # Clean up first to avoid signalling any ambiguous test results.
+        if diff_list_path.exists():
+            os.remove(diff_list_path)
+
         for sitemap in sitemaps.values():
             for location in [url.get("location") for url in sitemap().get_urls()][:2]:
+                themes = ["dark", "light"]
                 # https://www.browserstack.com/guide/common-screen-resolutions
                 # 414, 768, 1366
                 widths = [414, 768, 1366]
-                themes = ["dark", "light"]
 
                 page = self.browser.new_page(user_agent=self.mac_user_agent)
                 self.browser.browser_type.name
@@ -150,6 +158,12 @@ class ScreenshotTests(ReleaseMixin, GenerateScreenshotMixin, StaticLiveServerTes
                     )
                     for width in widths:
                         page.set_viewport_size({"width": width, "height": 800})
-                        variant = [self.browser.browser_type.name, str(width), theme]
+                        variant = [self.browser.browser_type.name, theme, str(width)]
 
-                        self.generateScreenshot(location, page, variant)
+                        msg = self.generateScreenshot(location, page, variant)
+                        if msg:
+                            msgs.append(msg)
+
+        if len(msgs) > 0:
+            with open(diff_list_path, "w") as f:
+                f.write("\n".join(msgs))
