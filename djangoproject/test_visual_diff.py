@@ -41,11 +41,12 @@ class GenerateScreenshotMixin:
         screen_name = f"{subdomain} {re.sub(r'/', ' ', path).strip()}"
         screen_name = re.sub(r"\s", "_", screen_name)
 
+        verbatim_baseline_path = self._verbatim_screenshot_path(screen_name, variant, "baseline.png")
         baseline_path = self._screenshot_path(screen_name, variant, "baseline.png")
         current_path = self._screenshot_path(screen_name, variant, "current.png")
         diff_path = self._screenshot_path(screen_name, variant, "diff.png")
 
-        baseline_path.parent.mkdir(parents=True, exist_ok=True)
+        verbatim_baseline_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Clean up first to avoid signalling any ambiguous test results.
         if current_path.exists():
@@ -54,23 +55,22 @@ class GenerateScreenshotMixin:
             os.remove(diff_path)
 
         page.goto(self.live_server_url + path)
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(300)
         screenshot_bytes = page.screenshot(full_page=True)
 
         if os.environ["SCREENSHOT_MODE"] == "baseline":
             baseline = Image.open(io.BytesIO(screenshot_bytes))
-            baseline.save(baseline_path)
+            baseline.save(verbatim_baseline_path)
             return
-        elif not baseline_path.exists():
+        elif not verbatim_baseline_path.exists():
             print(
                 f"Skipped {'/'.join([screen_name, *variant])}, baseline screenshot does not exist"
             )
             return
 
         current = Image.open(io.BytesIO(screenshot_bytes))
-        current.save(current_path)
 
-        baseline = Image.open(baseline_path)
+        baseline = Image.open(verbatim_baseline_path)
         if baseline.size != current.size:
             # Resize both to the largest of both dimensions to enable
             # comparison.
@@ -90,11 +90,19 @@ class GenerateScreenshotMixin:
         diff = Image.new("RGBA", baseline.size)
         diff_ratio = pixelmatch(current, baseline, diff)
         if diff_ratio > 0:
+            baseline_path.parent.mkdir(parents=True, exist_ok=True)
+            baseline.save(baseline_path)
+            current.save(current_path)
             diff.save(diff_path)
             return f"Differences in {'/'.join([screen_name, *variant])}"
 
         # if diff_ratio > threshold:
         #     self.fail(f"Screenshot {screen_name!r} differs by {diff_ratio:.2%} (threshold {threshold:.2%})")
+
+    def _verbatim_screenshot_path(self, screen_name, variant, name):
+        return Path().joinpath(
+            screenshots_dir, ".baseline", screen_name, *variant, name
+        )
 
     def _screenshot_path(self, screen_name, variant, name):
         return Path().joinpath(
