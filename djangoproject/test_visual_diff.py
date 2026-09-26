@@ -31,7 +31,6 @@ widths = (
     if "SCREENSHOT_WIDTHS" in os.environ
     else [
         414,
-        768,
         1366,
     ]  # https://www.browserstack.com/guide/common-screen-resolutions
 )
@@ -45,6 +44,8 @@ class GenerateScreenshotMixin:
         *_, subdomain, path = re.split(pattern, location)
         screen_name = f"{subdomain} {re.sub(r'/', ' ', path).strip()}"
         screen_name = re.sub(r"\s", "_", screen_name)
+
+        print(f"Processing {'/'.join([screen_name, *variant])}")
 
         # Keep two baselines - one we keep frozen on disk to compare with, and
         # another to show to the user which we may modify to match image
